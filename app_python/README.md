@@ -1,3 +1,6 @@
+![Python CI](https://github.com/TovarishDru/DevOps-Core-Course/actions/workflows/python-ci.yml/badge.svg)
+
+
 # DevOps Info Service
 
 ## Overview
@@ -24,6 +27,18 @@ docker build -t devops-python-app ./app_python
 ## Running the Application
 ```bash
 docker run -d -p 8000:8000 --name python-container devops-python-app
+```
+
+## Rinning tests locally
+
+### The **venv** package and **Python** are required
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r ./app_python/requirements.txt
+pip install -r ./app_python/dev-requirements.txt
+pytest app_python
 ```
 
 ## API Endpoints
