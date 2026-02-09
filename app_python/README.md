@@ -6,21 +6,24 @@ This project serves as the foundation for future DevOps labs involving
 containerization, CI/CD, monitoring, and Kubernetes.
 
 ## Prerequisites
-- Python 3.11+
-- pip
+- docker
 
 ## Installation
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+docker pull tovarishdru/devops-python-app:v1.0
+```
+
+**OR**
+
+```bash
+git clone https://github.com/TovarishDru/DevOps-Core-Course.git
+cd ./DevOps-Core-Course
+docker build -t devops-python-app ./app_python
 ```
 
 ## Running the Application
 ```bash
-python app.py
-# Or with custom config
-PORT=8080 HOST=127.0.0.1 DEBUG=true python app.py
+docker run -d -p 8000:8000 --name python-container devops-python-app
 ```
 
 ## API Endpoints
