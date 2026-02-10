@@ -37,7 +37,7 @@ docker run -d -p 8000:8000 --name python-container devops-python-app
 python3 -m venv venv
 source venv/bin/activate
 pip install -r ./app_python/requirements.txt
-pip install -r ./app_python/dev-requirements.txt
+pip install -r ./app_python/requirements-dev.txt
 pytest app_python
 ```
 
