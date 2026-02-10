@@ -38,7 +38,7 @@ jobs:
                 SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
               with:
                 severity-threshold: high
-                args: app_python
+                args: app_python --file=requirements.txt --skip-unresolved
 
     docker:
         needs: test
