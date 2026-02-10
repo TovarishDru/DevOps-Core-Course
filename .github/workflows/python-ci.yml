@@ -34,7 +34,7 @@ jobs:
               run: pytest app_python --cov=app_python --cov-report=term
 
             - name: Snyk scan
-              uses: snyk/actions/python@v2
+              uses: snyk/actions/python@v3
               env:
                 SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
               with:
