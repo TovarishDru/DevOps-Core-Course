@@ -27,7 +27,7 @@ jobs:
                 pip install -r app_python/requirements-dev.txt
 
             - name: Lint (ruff)
-              run: ruff app_python
+              run: ruff check app_python
 
             - name: Run tests
               run: pytest app_python --cov=app_python --cov-report=term
