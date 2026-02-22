@@ -1,0 +1,14 @@
+---
+# Main playbook - runs all roles
+# This playbook combines provisioning and deployment
+
+- name: Full site deployment
+  hosts: webservers
+  become: yes
+  vars_files:
+    - ../group_vars/all.yml
+
+  roles:
+    - common
+    - docker
+    - app_deploy

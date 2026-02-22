@@ -1,0 +1,21 @@
+---
+# Default variables for common role
+
+# List of common packages to install
+common_packages:
+  - python3-pip
+  - curl
+  - git
+  - vim
+  - htop
+  - wget
+  - unzip
+  - ca-certificates
+  - gnupg
+  - lsb-release
+
+# Timezone setting
+timezone: "UTC"
+
+# APT cache valid time in seconds (1 hour)
+apt_cache_valid_time: 3600
