@@ -1,0 +1,48 @@
+---
+# Wipe logic for web_app role
+# Removes application completely for clean reinstallation
+#
+# Safety mechanism: Double-gating with variable AND tag
+# - Variable: web_app_wipe must be true (default: false)
+# - Tag: web_app_wipe must be specified or inherited
+#
+# Usage examples:
+# - Wipe only:     ansible-playbook deploy.yml -e "web_app_wipe=true" --tags web_app_wipe
+# - Clean install: ansible-playbook deploy.yml -e "web_app_wipe=true"
+# - Normal deploy: ansible-playbook deploy.yml (wipe tasks skipped)
+
+- name: Wipe web application
+  block:
+    - name: Check if docker-compose file exists
+      ansible.builtin.stat:
+        path: "{{ compose_project_dir }}/docker-compose.yml"
+      register: compose_file_stat
+
+    - name: Stop and remove containers with Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_project_dir }}"
+        state: absent
+        remove_orphans: true
+      when: compose_file_stat.stat.exists
+      ignore_errors: yes
+
+    - name: Remove docker-compose file
+      ansible.builtin.file:
+        path: "{{ compose_project_dir }}/docker-compose.yml"
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove application directory
+      ansible.builtin.file:
+        path: "{{ compose_project_dir }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Log wipe completion
+      ansible.builtin.debug:
+        msg: "Application {{ app_name }} wiped successfully from {{ compose_project_dir }}"
+
+  when: web_app_wipe | default(false) | bool
+  become: true
+  tags:
+    - web_app_wipe

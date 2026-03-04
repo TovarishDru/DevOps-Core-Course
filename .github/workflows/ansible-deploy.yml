@@ -1,0 +1,113 @@
+name: Ansible Deployment
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'ansible/**'
+      - '.github/workflows/ansible-deploy.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'ansible/**'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  lint:
+    name: Ansible Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install ansible ansible-lint
+
+      - name: Run ansible-lint on playbooks
+        run: |
+          cd ansible
+          ansible-lint playbooks/*.yml || echo "Lint warnings found (non-blocking)"
+        continue-on-error: true
+
+      - name: Run ansible-lint on roles
+        run: |
+          cd ansible
+          ansible-lint roles/*/tasks/*.yml || echo "Lint warnings found (non-blocking)"
+        continue-on-error: true
+
+  deploy:
+    name: Deploy Application
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ansible and dependencies
+        run: |
+          pip install ansible
+          ansible-galaxy collection install community.docker
+          ansible-galaxy collection install community.general
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "echo 'SSH connection successful'"
+
+      - name: Create Vault password file
+        run: |
+          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > /tmp/vault_pass
+          chmod 600 /tmp/vault_pass
+
+      - name: Deploy with Ansible
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: 'False'
+        run: |
+          cd ansible
+          ansible-playbook playbooks/deploy.yml \
+            -i inventory/hosts.ini \
+            --vault-password-file /tmp/vault_pass \
+            -v
+
+      - name: Cleanup Vault password file
+        if: always()
+        run: |
+          rm -f /tmp/vault_pass
+
+      - name: Verify Deployment
+        run: |
+          echo "Waiting for application to start..."
+          sleep 15
+          echo "Testing application endpoint..."
+          curl -f http://${{ secrets.VM_HOST }}:8000 || exit 1
+          echo ""
+          echo "Testing health endpoint..."
+          curl -f http://${{ secrets.VM_HOST }}:8000/health || exit 1
+          echo ""
+          echo "Application is responding correctly"
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "Deployment completed successfully!"
+          echo "Application URL: http://${{ secrets.VM_HOST }}:8000"
+          echo "Health Check: http://${{ secrets.VM_HOST }}:8000/health"

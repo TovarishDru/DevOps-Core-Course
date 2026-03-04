@@ -1,0 +1,94 @@
+---
+# Tasks for web_app role - Application deployment with Docker Compose
+
+# Wipe logic runs first (when explicitly requested)
+# This enables clean reinstallation: wipe old -> deploy new
+- name: Include wipe tasks
+  ansible.builtin.include_tasks: wipe.yml
+  tags:
+    - web_app_wipe
+
+# Deployment tasks
+- name: Deploy application with Docker Compose
+  block:
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ compose_project_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Template docker-compose file
+      ansible.builtin.template:
+        src: docker-compose.yml.j2
+        dest: "{{ compose_project_dir }}/docker-compose.yml"
+        mode: '0644'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      register: compose_template_result
+
+    - name: Log in to Docker Hub
+      community.docker.docker_login:
+        username: "{{ dockerhub_username }}"
+        password: "{{ dockerhub_password }}"
+      no_log: true
+
+    - name: Deploy with docker compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_project_dir }}"
+        state: present
+        pull: always
+      register: compose_result
+
+    - name: Display deployment result
+      ansible.builtin.debug:
+        msg: "Application {{ app_name }} deployed successfully using Docker Compose"
+
+    - name: Wait for application to be ready
+      ansible.builtin.wait_for:
+        port: "{{ app_port }}"
+        host: "0.0.0.0"
+        delay: "{{ health_check_delay }}"
+        timeout: "{{ health_check_timeout }}"
+
+    - name: Verify health endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:{{ app_port }}{{ health_check_path }}"
+        method: GET
+        status_code: 200
+      register: health_check_result
+      retries: 5
+      delay: 3
+      until: health_check_result.status == 200
+
+    - name: Display health check result
+      ansible.builtin.debug:
+        msg: "Application health check passed! Status: {{ health_check_result.status }}"
+
+  rescue:
+    - name: Handle deployment failure
+      ansible.builtin.debug:
+        msg: "Deployment failed. Check logs at {{ compose_project_dir }}"
+
+    - name: Show compose logs on failure
+      ansible.builtin.command:
+        cmd: docker compose -f {{ compose_project_dir }}/docker-compose.yml logs --tail=50
+      register: compose_logs
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Display logs
+      ansible.builtin.debug:
+        var: compose_logs.stdout_lines
+      when: compose_logs.stdout_lines is defined
+
+    - name: Fail with error message
+      ansible.builtin.fail:
+        msg: "Docker Compose deployment failed. See logs above for details."
+
+  become: true
+  tags:
+    - app_deploy
+    - compose
+    - web_app
