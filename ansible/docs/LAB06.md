@@ -837,21 +837,6 @@ A:
 - **Total:** ~4.5 hours
 ---
 
-## Evidence Checklist
-
-- [x] Ansible playbook output with selective tags
-- [x] Rescue block triggered output
-- [x] Docker Compose deployment success
-- [x] Idempotency verification (2nd run)
-- [x] Wipe logic test results (all 4 scenarios)
-- [x] GitHub Actions successful workflow
-- [x] ansible-lint passing
-- [x] Status badge in README
-- [x] Application accessible via curl
-- [x] All research questions answered
-
----
-
 ## File Structure
 
 ```
