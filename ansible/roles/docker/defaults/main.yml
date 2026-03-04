@@ -1,0 +1,25 @@
+---
+# Default variables for docker role
+
+# Docker packages to install
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# User to add to docker group (allows running docker without sudo)
+docker_user: "{{ ansible_user }}"
+
+# Docker GPG key URL
+docker_gpg_url: "https://download.docker.com/linux/ubuntu/gpg"
+
+# Docker repository
+docker_repo: "deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+
+# Architecture mapping
+docker_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else ansible_facts['architecture'] }}"
+
+# Python Docker package for Ansible modules
+python_docker_package: python3-docker
