@@ -2,12 +2,12 @@ name: Ansible Deployment
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
     paths:
       - 'ansible/**'
       - '.github/workflows/ansible-deploy.yml'
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
     paths:
       - 'ansible/**'
   workflow_dispatch:  # Allow manual trigger
@@ -29,24 +29,29 @@ jobs:
         run: |
           pip install ansible ansible-lint
 
-      - name: Run ansible-lint on playbooks
+      - name: Create dummy vault password for linting
+        run: |
+          echo "dummy_password_for_lint" > /tmp/vault_pass
+          chmod 600 /tmp/vault_pass
+
+      - name: Run ansible-lint
+        env:
+          ANSIBLE_VAULT_PASSWORD_FILE: /tmp/vault_pass
         run: |
           cd ansible
-          ansible-lint playbooks/*.yml || echo "Lint warnings found (non-blocking)"
+          ansible-lint --config-file .ansible-lint . || echo "Lint completed with warnings"
         continue-on-error: true
 
-      - name: Run ansible-lint on roles
-        run: |
-          cd ansible
-          ansible-lint roles/*/tasks/*.yml || echo "Lint warnings found (non-blocking)"
-        continue-on-error: true
+      - name: Cleanup vault password file
+        if: always()
+        run: rm -f /tmp/vault_pass
 
   deploy:
     name: Deploy Application
     needs: lint
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

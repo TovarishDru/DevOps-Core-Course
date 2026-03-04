@@ -15,7 +15,7 @@ common_packages:
   - lsb-release
 
 # Timezone setting
-timezone: "UTC"
+common_timezone: "UTC"
 
 # APT cache valid time in seconds (1 hour)
-apt_cache_valid_time: 3600
+common_apt_cache_valid_time: 3600
