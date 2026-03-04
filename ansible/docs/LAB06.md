@@ -755,7 +755,7 @@ jobs:
 ### 4.4 Testing Results
 
 **Workflow run:**
-[Screenshot of successful workflow execution]
+![Screenshot of successful workflow execution](./screenshots/GitHubWorkflow.png)
 
 **Lint job output:**
 ```
