@@ -94,6 +94,8 @@ jobs:
           ansible-playbook playbooks/deploy.yml \
             -i inventory/hosts.ini \
             --vault-password-file /tmp/vault_pass \
+            -e "ansible_host=${{ secrets.VM_HOST }}" \
+            -e "ansible_user=${{ secrets.VM_USER }}" \
             -v
 
       - name: Cleanup Vault password file
