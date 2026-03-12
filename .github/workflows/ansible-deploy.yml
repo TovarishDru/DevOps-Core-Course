@@ -67,20 +67,19 @@ jobs:
           ansible-galaxy collection install community.docker
           ansible-galaxy collection install community.general
 
-      - name: Setup SSH
+      - name: Setup SSH with webfactory/ssh-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          # Start ssh-agent and add key
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_rsa
-          # Add host to known_hosts
           ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Test SSH connection
         run: |
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=~/.ssh/known_hosts ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "echo 'SSH connection successful'"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "echo 'SSH connection successful'"
 
       - name: Create Vault password file
         run: |
