@@ -15,11 +15,13 @@ docker_user: "{{ ansible_user }}"
 # Docker GPG key URL
 docker_gpg_url: "https://download.docker.com/linux/ubuntu/gpg"
 
-# Docker repository
-docker_repo: "deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+# Docker repository (split for line length)
+docker_repo: >-
+  deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg]
+  https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable
 
 # Architecture mapping
 docker_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else ansible_facts['architecture'] }}"
 
 # Python Docker package for Ansible modules
-python_docker_package: python3-docker
+docker_python_package: python3-docker

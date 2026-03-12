@@ -1,0 +1,23 @@
+---
+# Role dependencies for web_app
+# Ensures Docker is installed before deploying application
+#
+# This dependency ensures that when web_app role is called,
+# the docker role will automatically run first to ensure
+# Docker is available for container deployment.
+
+galaxy_info:
+  author: DevOps Course
+  description: Web application deployment role using Docker Compose
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - focal
+
+dependencies:
+  - role: docker
+    # Docker role must run first to ensure Docker is available
+    # for container deployment with Docker Compose

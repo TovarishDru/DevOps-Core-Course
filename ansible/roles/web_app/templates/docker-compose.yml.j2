@@ -1,0 +1,25 @@
+services:
+  {{ app_name }}:
+    image: {{ docker_image }}:{{ docker_tag }}
+    container_name: {{ app_name }}
+    ports:
+      - "{{ app_port }}:{{ app_internal_port }}"
+{% if app_env_vars %}
+    environment:
+{% for key, value in app_env_vars.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+    restart: unless-stopped
+    networks:
+      - {{ app_name }}_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{ app_internal_port }}{{ health_check_path }}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  {{ app_name }}_network:
+    driver: bridge

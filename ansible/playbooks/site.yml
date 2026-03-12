@@ -1,6 +1,7 @@
 ---
 # Main playbook - runs all roles
 # This playbook combines provisioning and deployment
+# Uses web_app role with Docker Compose
 
 - name: Full site deployment
   hosts: webservers
@@ -11,4 +12,4 @@
   roles:
     - common
     - docker
-    - app_deploy
+    - web_app

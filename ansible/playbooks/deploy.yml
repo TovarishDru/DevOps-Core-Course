@@ -1,6 +1,7 @@
 ---
 # Deployment playbook - application deployment only
-# Deploys the containerized application
+# Deploys the containerized application using Docker Compose
+# Uses web_app role with Docker Compose
 
 - name: Deploy application
   hosts: webservers
@@ -9,4 +10,4 @@
     - ../group_vars/all.yml
 
   roles:
-    - app_deploy
+    - web_app

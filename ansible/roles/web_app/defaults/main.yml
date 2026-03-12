@@ -1,0 +1,40 @@
+---
+# Default variables for web_app role
+
+# Application settings
+app_name: devops-python-app
+app_port: 8000
+app_internal_port: 8000
+
+# Docker image settings
+docker_image: "{{ dockerhub_username }}/devops-python-app"
+docker_tag: v1.0
+
+# Docker Compose configuration
+compose_project_dir: "/opt/{{ app_name }}"
+docker_compose_version: "3.8"
+
+# Health check settings
+health_check_path: /health
+health_check_timeout: 60
+health_check_delay: 5
+
+# Environment variables for the container
+app_env_vars: {}
+
+# =============================================================================
+# Wipe Logic Control
+# =============================================================================
+# Set to true to remove application completely before deployment
+# Default: false (do not wipe)
+#
+# Usage examples:
+#   Wipe only:     ansible-playbook deploy.yml -e "web_app_wipe=true" --tags web_app_wipe
+#   Clean install: ansible-playbook deploy.yml -e "web_app_wipe=true"
+#   Normal deploy: ansible-playbook deploy.yml (wipe tasks skipped)
+#
+# Safety: Wipe requires BOTH:
+#   1. web_app_wipe=true (variable)
+#   2. web_app_wipe tag (specified or inherited)
+# =============================================================================
+web_app_wipe: false

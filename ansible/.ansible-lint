@@ -1,0 +1,19 @@
+---
+# Ansible-lint configuration
+
+# Skip syntax checking (requires vault password)
+skip_list:
+  - internal-error  # Skip syntax check errors due to vault
+
+# Exclude paths
+exclude_paths:
+  - .cache/
+  - group_vars/all.yml  # Encrypted vault file
+
+# Enable offline mode to avoid network issues
+offline: true
+
+# Warn only for these rules (non-blocking)
+warn_list:
+  - experimental
+  - role-name

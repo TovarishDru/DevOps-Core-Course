@@ -1,59 +1,96 @@
 ---
 # Tasks for docker role - Docker installation on Ubuntu
 
-- name: Create keyrings directory
-  ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: '0755'
+- name: Docker installation block
+  become: true
+  tags:
+    - docker_install
+    - docker
+  block:
+    - name: Create keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
 
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: "{{ docker_gpg_url }}"
-    dest: /etc/apt/keyrings/docker.asc
-    mode: '0644'
+    - name: Add Docker GPG key
+      ansible.builtin.get_url:
+        url: "{{ docker_gpg_url }}"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
 
-- name: Convert GPG key to binary format
-  ansible.builtin.shell: |
-    gpg --dearmor < /etc/apt/keyrings/docker.asc > /etc/apt/keyrings/docker.gpg
-  args:
-    creates: /etc/apt/keyrings/docker.gpg
+    - name: Convert GPG key to binary format
+      ansible.builtin.shell: |
+        gpg --dearmor < /etc/apt/keyrings/docker.asc > /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
 
-- name: Set permissions on GPG key
-  ansible.builtin.file:
-    path: /etc/apt/keyrings/docker.gpg
-    mode: '0644'
+    - name: Set permissions on GPG key
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/docker.gpg
+        mode: '0644'
 
-- name: Add Docker repository
-  ansible.builtin.apt_repository:
-    repo: "{{ docker_repo }}"
-    state: present
-    filename: docker
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: "{{ docker_repo }}"
+        state: present
+        filename: docker
 
-- name: Update apt cache after adding Docker repo
-  ansible.builtin.apt:
-    update_cache: yes
-    cache_valid_time: 3600
+    - name: Update apt cache after adding Docker repo
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
 
-- name: Install Docker packages
-  ansible.builtin.apt:
-    name: "{{ docker_packages }}"
-    state: present
-  notify: restart docker
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name: "{{ docker_packages }}"
+        state: present
+      notify: Restart docker
 
-- name: Ensure Docker service is running and enabled
-  ansible.builtin.service:
-    name: docker
-    state: started
-    enabled: yes
+  rescue:
+    - name: Wait before retry on GPG key or network failure
+      ansible.builtin.pause:
+        seconds: 10
 
-- name: Add user to docker group
-  ansible.builtin.user:
-    name: "{{ docker_user }}"
-    groups: docker
-    append: yes
+    - name: Retry apt update after failure
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 0
 
-- name: Install Python Docker package for Ansible modules
-  ansible.builtin.apt:
-    name: "{{ python_docker_package }}"
-    state: present
+    - name: Retry Docker package installation
+      ansible.builtin.apt:
+        name: "{{ docker_packages }}"
+        state: present
+      notify: Restart docker
+
+  always:
+    - name: Ensure Docker service is enabled and started
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+      failed_when: false
+
+- name: Docker configuration block
+  become: true
+  tags:
+    - docker_config
+    - docker
+  block:
+    - name: Add user to docker group
+      ansible.builtin.user:
+        name: "{{ docker_user }}"
+        groups: docker
+        append: true
+
+    - name: Install Python Docker package for Ansible modules
+      ansible.builtin.apt:
+        name: "{{ docker_python_package }}"
+        state: present
+
+  always:
+    - name: Log Docker configuration completion
+      ansible.builtin.copy:
+        content: "Docker configured at {{ ansible_facts['date_time']['iso8601'] }}\n"
+        dest: /tmp/docker_config_complete.log
+        mode: '0644'
