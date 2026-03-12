@@ -2,8 +2,36 @@ import os
 import socket
 import platform
 import logging
+import json
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
+
+
+# JSON Formatter for structured logging
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_data = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+        
+        if hasattr(record, "method"):
+            log_data["method"] = record.method
+        if hasattr(record, "path"):
+            log_data["path"] = record.path
+        if hasattr(record, "status_code"):
+            log_data["status_code"] = record.status_code
+        if hasattr(record, "client_ip"):
+            log_data["client_ip"] = record.client_ip
+        if hasattr(record, "user_agent"):
+            log_data["user_agent"] = record.user_agent
+            
+        return json.dumps(log_data)
 
 
 # Configuration
@@ -21,13 +49,27 @@ FRAMEWORK = "Flask"
 app = Flask(__name__)
 START_TIME = datetime.now(timezone.utc)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
 
-logger.info("Application starting...")
+# Configure JSON logging
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+
+
+# Also configure root logger for Flask
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.handlers = []
+root_logger.addHandler(handler)
+
+
+logger.info("Application starting", extra={
+    "service": SERVICE_NAME,
+    "version": SERVICE_VERSION,
+    "port": PORT
+})
 
 
 # Helper functions
@@ -54,11 +96,31 @@ def get_system_info():
     }
 
 
+# Request/Response logging middleware
+@app.before_request
+def log_request():
+    logger.info("Incoming request", extra={
+        "method": request.method,
+        "path": request.path,
+        "client_ip": request.remote_addr,
+        "user_agent": request.headers.get("User-Agent", "Unknown")
+    })
+
+
+@app.after_request
+def log_response(response):
+    logger.info("Outgoing response", extra={
+        "method": request.method,
+        "path": request.path,
+        "status_code": response.status_code,
+        "client_ip": request.remote_addr
+    })
+    return response
+
+
 # Routes
 @app.route("/", methods=["GET"])
 def index():
-    logger.debug("Handling main endpoint request")
-
     uptime = get_uptime()
 
     response = {
@@ -106,12 +168,12 @@ def health():
 # Error Handlers
 @app.errorhandler(404)
 def not_found(error):
-    logger.warning(
-        "404 Not Found - %s %s from %s",
-        request.method,
-        request.path,
-        request.remote_addr,
-    )
+    logger.warning("404 Not Found", extra={
+        "method": request.method,
+        "path": request.path,
+        "client_ip": request.remote_addr,
+        "status_code": 404
+    })
 
     return jsonify(
         {
@@ -123,12 +185,13 @@ def not_found(error):
 
 @app.errorhandler(500)
 def internal_error(error):
-    logger.exception(
-        "500 Internal Server Error - %s %s from %s",
-        request.method,
-        request.path,
-        request.remote_addr,
-    )
+    logger.error("500 Internal Server Error", extra={
+        "method": request.method,
+        "path": request.path,
+        "client_ip": request.remote_addr,
+        "status_code": 500,
+        "error": str(error)
+    })
 
     return jsonify(
         {
