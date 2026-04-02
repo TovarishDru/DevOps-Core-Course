@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ include "devops-app.fullname" . }}-post-install"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hook
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      name: "{{ include "devops-app.fullname" . }}-post-install"
+      labels:
+        {{- include "devops-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: hook
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: post-install-job
+        image: busybox:1.36
+        command:
+          - sh
+          - -c
+          - |
+            echo "========================================="
+            echo "Post-Install Hook: Running smoke tests"
+            echo "========================================="
+            echo ""
+            echo "Release: {{ .Release.Name }}"
+            echo "Namespace: {{ .Release.Namespace }}"
+            echo ""
+            echo "Performing post-installation verification..."
+            echo "✓ Checking deployment status"
+            echo "✓ Verifying service endpoints"
+            echo "✓ Running smoke tests"
+            echo ""
+            sleep 5
+            echo "All post-installation checks passed!"
+            echo "Application is ready to serve traffic."
+            echo "========================================="

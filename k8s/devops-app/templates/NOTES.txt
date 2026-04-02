@@ -1,0 +1,64 @@
+{{ .Chart.Name }} has been successfully deployed!
+
+Release Name: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Chart Version: {{ .Chart.Version }}
+App Version: {{ .Chart.AppVersion }}
+
+Deployment Status:
+  Replicas: {{ .Values.replicaCount }}
+  Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+
+Access Your Application:
+
+{{- if eq .Values.service.type "NodePort" }}
+  The application is exposed via NodePort.
+
+  1. Get the node port:
+     export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "devops-app.fullname" . }})
+     echo "NodePort: $NODE_PORT"
+
+  2. Access via port-forward (recommended for local clusters):
+     kubectl port-forward --namespace {{ .Release.Namespace }} service/{{ include "devops-app.fullname" . }} 8080:{{ .Values.service.port }}
+     
+     Then visit: http://localhost:8080
+
+  3. Or access directly (if using kind/minikube):
+     curl http://localhost:$NODE_PORT/health
+
+{{- else if eq .Values.service.type "LoadBalancer" }}
+  The application is exposed via LoadBalancer.
+
+  1. Get the external IP:
+     kubectl get service --namespace {{ .Release.Namespace }} {{ include "devops-app.fullname" . }}
+
+  2. Wait for EXTERNAL-IP to be assigned, then:
+     export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "devops-app.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+     echo "Visit http://$SERVICE_IP:{{ .Values.service.port }}"
+
+{{- else }}
+  The application is exposed via ClusterIP (internal only).
+
+  Access via port-forward:
+     kubectl port-forward --namespace {{ .Release.Namespace }} service/{{ include "devops-app.fullname" . }} 8080:{{ .Values.service.port }}
+     
+     Then visit: http://localhost:8080
+{{- end }}
+
+Useful Commands:
+
+  # Check deployment status
+  kubectl get deployment --namespace {{ .Release.Namespace }} {{ include "devops-app.fullname" . }}
+
+  # View pods
+  kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "devops-app.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+  # View logs
+  kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "devops-app.name" . }}" --tail=50
+
+  # Check health
+  kubectl exec --namespace {{ .Release.Namespace }} -it $(kubectl get pod --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "devops-app.name" . }}" -o jsonpath='{.items[0].metadata.name}') -- wget -qO- http://localhost:{{ .Values.service.targetPort }}/health
+
+Endpoints:
+  - GET /        → Service information
+  - GET /health  → Health check
