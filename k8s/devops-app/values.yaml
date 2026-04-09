@@ -66,3 +66,17 @@ strategy:
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0
+
+secrets:
+  DB_USERNAME: "placeholder-user"
+  DB_PASSWORD: "placeholder-pass"
+  API_KEY: "placeholder-api-key"
+
+serviceAccount:
+  create: true
+  name: "devops-app"
+
+vault:
+  enabled: false
+  role: "devops-app-role"
+  secretPath: "secret/data/devops-app/config"
