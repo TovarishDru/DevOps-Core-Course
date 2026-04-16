@@ -3,6 +3,7 @@ import socket
 import platform
 import logging
 import json
+import threading
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
 
@@ -38,6 +39,8 @@ class JSONFormatter(logging.Formatter):
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", 5000))
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+DATA_DIR = os.getenv("DATA_DIR", "/app/data")
+VISITS_FILE = os.path.join(DATA_DIR, "visits")
 
 SERVICE_NAME = "devops-info-service"
 SERVICE_VERSION = "1.0.0"
@@ -48,6 +51,9 @@ FRAMEWORK = "Flask"
 # App setup
 app = Flask(__name__)
 START_TIME = datetime.now(timezone.utc)
+
+# Thread lock for visits counter
+_visits_lock = threading.Lock()
 
 
 # Configure JSON logging
@@ -70,6 +76,36 @@ logger.info("Application starting", extra={
     "version": SERVICE_VERSION,
     "port": PORT
 })
+
+
+# Ensure data directory exists
+os.makedirs(DATA_DIR, exist_ok=True)
+
+
+# Visits counter helpers
+def read_visits():
+    """Read the current visit count from file. Returns 0 if file doesn't exist."""
+    try:
+        with open(VISITS_FILE, "r") as f:
+            return int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return 0
+
+
+def write_visits(count):
+    """Write the visit count to file using atomic write pattern."""
+    tmp_file = VISITS_FILE + ".tmp"
+    with open(tmp_file, "w") as f:
+        f.write(str(count))
+    os.replace(tmp_file, VISITS_FILE)
+
+
+def increment_visits():
+    """Thread-safe increment of the visits counter. Returns the new count."""
+    with _visits_lock:
+        count = read_visits() + 1
+        write_visits(count)
+        return count
 
 
 # Helper functions
@@ -123,6 +159,9 @@ def log_response(response):
 def index():
     uptime = get_uptime()
 
+    # Increment visits counter
+    visits = increment_visits()
+
     response = {
         "service": {
             "name": SERVICE_NAME,
@@ -143,9 +182,11 @@ def index():
             "method": request.method,
             "path": request.path,
         },
+        "visits": visits,
         "endpoints": [
             {"path": "/", "method": "GET", "description": "Service information"},
             {"path": "/health", "method": "GET", "description": "Health check"},
+            {"path": "/visits", "method": "GET", "description": "Visit counter"},
         ],
     }
 
@@ -163,6 +204,13 @@ def health():
             "uptime_seconds": uptime["seconds"],
         }
     )
+
+
+@app.route("/visits", methods=["GET"])
+def visits():
+    """Return the current visit count without incrementing."""
+    count = read_visits()
+    return jsonify({"visits": count})
 
 
 # Error Handlers
