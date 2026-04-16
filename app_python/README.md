@@ -29,7 +29,15 @@ docker build -t devops-python-app ./app_python
 docker run -d -p 8000:8000 --name python-container devops-python-app
 ```
 
-## Rinning tests locally
+### Running with Docker Compose (persistent visits counter)
+```bash
+cd app_python
+docker compose up -d
+```
+
+This mounts `./data` as a volume so the visits counter persists across container restarts.
+
+## Running tests locally
 
 ### The **venv** package and **Python** are required
 
@@ -45,17 +53,28 @@ pytest app_python
 
 ### GET /
 
-Returns service, system, runtime, and request information.
+Returns service, system, runtime, and request information. Also increments the visits counter.
 
 ### GET /health
 
 Health check endpoint for monitoring systems.
 
+### GET /visits
+
+Returns the current visit count without incrementing it.
+
+**Response:**
+```json
+{
+  "visits": 42
+}
+```
 
 ## Configuration
 
-| Variable | Default | Description       |
-| -------- | ------- | ----------------- |
-| HOST     | 0.0.0.0 | Bind address      |
-| PORT     | 5000    | Server port       |
-| DEBUG    | false   | Enable debug mode |
+| Variable | Default   | Description                        |
+| -------- | --------- | ---------------------------------- |
+| HOST     | 0.0.0.0   | Bind address                       |
+| PORT     | 5000      | Server port                        |
+| DEBUG    | false     | Enable debug mode                  |
+| DATA_DIR | /app/data | Directory for persistent data files |

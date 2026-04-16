@@ -18,6 +18,18 @@ env:
     value: "8000"
   - name: DEBUG
     value: "true"
+  - name: DATA_DIR
+    value: "/data"
+
+config:
+  environment: "development"
+  logLevel: "DEBUG"
+  appName: "devops-info-service"
+
+persistence:
+  enabled: true
+  size: 100Mi
+  storageClass: ""
 
 resources:
   requests:

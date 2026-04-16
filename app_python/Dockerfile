@@ -4,6 +4,7 @@ FROM python:3.13-slim
 ENV HOST=0.0.0.0
 ENV PORT=8000
 ENV DEBUG=false
+ENV DATA_DIR=/app/data
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -21,8 +22,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Change ownership to non-root user
-RUN chown -R appuser:appuser /app
+# Create data directory and change ownership to non-root user
+RUN mkdir -p /app/data && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
