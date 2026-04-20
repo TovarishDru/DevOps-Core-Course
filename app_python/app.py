@@ -3,8 +3,10 @@ import socket
 import platform
 import logging
 import json
+import time
 from datetime import datetime, timezone
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 
 
 # JSON Formatter for structured logging
@@ -20,6 +22,7 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
         }
         
+        # Add extra fields if present
         if hasattr(record, "method"):
             log_data["method"] = record.method
         if hasattr(record, "path"):
@@ -49,7 +52,6 @@ FRAMEWORK = "Flask"
 app = Flask(__name__)
 START_TIME = datetime.now(timezone.utc)
 
-
 # Configure JSON logging
 handler = logging.StreamHandler()
 handler.setFormatter(JSONFormatter())
@@ -57,19 +59,54 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
-
 # Also configure root logger for Flask
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 root_logger.handlers = []
 root_logger.addHandler(handler)
 
-
 logger.info("Application starting", extra={
     "service": SERVICE_NAME,
     "version": SERVICE_VERSION,
     "port": PORT
 })
+
+
+# Prometheus Metrics
+# Counter: Total HTTP requests
+http_requests_total = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status']
+)
+
+# Histogram: Request duration
+http_request_duration_seconds = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration in seconds',
+    ['method', 'endpoint'],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)
+)
+
+# Gauge: Active requests
+http_requests_in_progress = Gauge(
+    'http_requests_in_progress',
+    'HTTP requests currently being processed',
+    ['method', 'endpoint']
+)
+
+# Application-specific metrics
+endpoint_calls = Counter(
+    'devops_info_endpoint_calls',
+    'Number of calls to specific endpoints',
+    ['endpoint']
+)
+
+system_info_collection_duration = Histogram(
+    'devops_info_system_collection_seconds',
+    'Time spent collecting system information',
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0)
+)
 
 
 # Helper functions
@@ -86,7 +123,8 @@ def get_uptime():
 
 
 def get_system_info():
-    return {
+    start_time = time.time()
+    info = {
         "hostname": socket.gethostname(),
         "platform": platform.system(),
         "platform_version": platform.version(),
@@ -94,11 +132,35 @@ def get_system_info():
         "cpu_count": os.cpu_count(),
         "python_version": platform.python_version(),
     }
+    duration = time.time() - start_time
+    system_info_collection_duration.observe(duration)
+    return info
 
 
-# Request/Response logging middleware
+def normalize_endpoint(path):
+    """Normalize endpoint paths to reduce cardinality"""
+    if path == '/':
+        return '/'
+    elif path == '/health':
+        return '/health'
+    elif path == '/metrics':
+        return '/metrics'
+    else:
+        return '/other'
+
+
+# Request/Response logging and metrics middleware
 @app.before_request
-def log_request():
+def before_request():
+    request.start_time = time.time()
+    endpoint = normalize_endpoint(request.path)
+    
+    # Increment in-progress gauge
+    http_requests_in_progress.labels(
+        method=request.method,
+        endpoint=endpoint
+    ).inc()
+    
     logger.info("Incoming request", extra={
         "method": request.method,
         "path": request.path,
@@ -108,19 +170,46 @@ def log_request():
 
 
 @app.after_request
-def log_response(response):
+def after_request(response):
+    endpoint = normalize_endpoint(request.path)
+    
+    # Calculate request duration
+    if hasattr(request, 'start_time'):
+        duration = time.time() - request.start_time
+        
+        # Record metrics
+        http_request_duration_seconds.labels(
+            method=request.method,
+            endpoint=endpoint
+        ).observe(duration)
+    
+    # Increment request counter
+    http_requests_total.labels(
+        method=request.method,
+        endpoint=endpoint,
+        status=response.status_code
+    ).inc()
+    
+    # Decrement in-progress gauge
+    http_requests_in_progress.labels(
+        method=request.method,
+        endpoint=endpoint
+    ).dec()
+    
     logger.info("Outgoing response", extra={
         "method": request.method,
         "path": request.path,
         "status_code": response.status_code,
         "client_ip": request.remote_addr
     })
+    
     return response
 
 
 # Routes
 @app.route("/", methods=["GET"])
 def index():
+    endpoint_calls.labels(endpoint='/').inc()
     uptime = get_uptime()
 
     response = {
@@ -146,6 +235,7 @@ def index():
         "endpoints": [
             {"path": "/", "method": "GET", "description": "Service information"},
             {"path": "/health", "method": "GET", "description": "Health check"},
+            {"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
         ],
     }
 
@@ -154,6 +244,7 @@ def index():
 
 @app.route("/health", methods=["GET"])
 def health():
+    endpoint_calls.labels(endpoint='/health').inc()
     uptime = get_uptime()
 
     return jsonify(
@@ -163,6 +254,54 @@ def health():
             "uptime_seconds": uptime["seconds"],
         }
     )
+
+
+@app.route("/metrics", methods=["GET"])
+def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
+
+@app.route("/error", methods=["GET"])
+def trigger_error():
+    """Endpoint that intentionally returns 500 error for testing"""
+    endpoint_calls.labels(endpoint='/error').inc()
+    
+    logger.error("Intentional error triggered", extra={
+        "method": request.method,
+        "path": request.path,
+        "client_ip": request.remote_addr,
+        "status_code": 500
+    })
+    
+    return jsonify(
+        {
+            "error": "Internal Server Error",
+            "message": "This is an intentional error for testing metrics",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    ), 500
+
+
+@app.route("/bad-request", methods=["GET"])
+def bad_request():
+    """Endpoint that returns 400 Bad Request for testing"""
+    endpoint_calls.labels(endpoint='/bad-request').inc()
+    
+    logger.warning("Bad request triggered", extra={
+        "method": request.method,
+        "path": request.path,
+        "client_ip": request.remote_addr,
+        "status_code": 400
+    })
+    
+    return jsonify(
+        {
+            "error": "Bad Request",
+            "message": "This is an intentional 400 error for testing client error metrics",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    ), 400
 
 
 # Error Handlers
