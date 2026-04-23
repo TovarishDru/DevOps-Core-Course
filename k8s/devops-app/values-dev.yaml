@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: tovarishdru/devops-python-app
-  tag: "latest"
+  tag: "v1.0"
   pullPolicy: Always
 
 service:
