@@ -99,6 +99,12 @@ python-app-dev    https://kubernetes.default.svc  dev        default  Synced  He
 python-app-prod   https://kubernetes.default.svc  prod       default  Synced  Progressing  Manual      https://github.com/TovarishDru/DevOps-Core-Course.git  k8s/devops-app  master
 ```
 
+### ArgoCD Dashboard
+
+![ArgoCD Applications Summary](screenshots/argocd_dashboard.png)
+
+The dashboard shows all 3 applications synced (Sync chart fully green), with 2 Healthy and 1 Progressing (prod LoadBalancer), deployed across 3 namespaces on 1 cluster.
+
 ---
 
 ## Multi-Environment Deployment
