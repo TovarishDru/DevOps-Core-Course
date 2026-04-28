@@ -1,0 +1,15 @@
+# Blue-Green deployment strategy override
+# Usage: helm upgrade --install devops-app ./k8s/devops-app -f k8s/devops-app/values-bluegreen.yaml
+
+rollout:
+  enabled: true
+  strategy: blueGreen
+  blueGreen:
+    autoPromotionEnabled: false
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 8000
+  nodePort: 30082
+  previewNodePort: 30083
