@@ -1,0 +1,18 @@
+image:
+  tag: "v1.1"
+
+# Disable Rollout
+rollout:
+  enabled: false
+
+# Enable StatefulSet
+statefulSet:
+  enabled: true
+
+# Persistent storage
+persistence:
+  size: "100Mi"
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  mountPath: "/data"

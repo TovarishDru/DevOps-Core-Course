@@ -40,9 +40,10 @@ PORT = int(os.getenv("PORT", 5000))
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 SERVICE_NAME = "devops-info-service"
-SERVICE_VERSION = "1.0.0"
+SERVICE_VERSION = "1.1.0"
 SERVICE_DESCRIPTION = "DevOps course info service"
 FRAMEWORK = "Flask"
+VISITS_FILE = os.getenv("VISITS_FILE", "/data/visits")
 
 
 # App setup
@@ -146,6 +147,7 @@ def index():
         "endpoints": [
             {"path": "/", "method": "GET", "description": "Service information"},
             {"path": "/health", "method": "GET", "description": "Health check"},
+            {"path": "/visits", "method": "GET", "description": "Visit counter (persistent)"},
         ],
     }
 
@@ -163,6 +165,34 @@ def health():
             "uptime_seconds": uptime["seconds"],
         }
     )
+
+
+@app.route("/visits", methods=["GET"])
+def visits():
+    count = 0
+    try:
+        with open(VISITS_FILE, "r") as f:
+            count = int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        count = 0
+
+    count += 1
+
+    os.makedirs(os.path.dirname(VISITS_FILE), exist_ok=True)
+    with open(VISITS_FILE, "w") as f:
+        f.write(str(count))
+
+    logger.info("Visit counted", extra={
+        "visits": count,
+        "pod": socket.gethostname(),
+        "visits_file": VISITS_FILE,
+    })
+
+    return jsonify({
+        "visits": count,
+        "pod": socket.gethostname(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
 
 
 # Error Handlers

@@ -101,3 +101,15 @@ rollout:
       - setWeight: 100
   blueGreen:
     autoPromotionEnabled: false
+
+# StatefulSet configuration
+statefulSet:
+  enabled: false
+
+# Persistent storage for StatefulSet
+persistence:
+  size: "100Mi"
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  mountPath: "/data"

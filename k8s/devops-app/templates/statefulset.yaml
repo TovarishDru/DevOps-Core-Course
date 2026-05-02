@@ -1,14 +1,14 @@
-{{- if and .Values.rollout.enabled (not .Values.statefulSet.enabled) }}
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
+{{- if .Values.statefulSet.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   name: {{ include "devops-app.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "devops-app.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "devops-app.fullname" . }}-headless
   replicas: {{ .Values.replicaCount }}
-  revisionHistoryLimit: 3
   selector:
     matchLabels:
       {{- include "devops-app.selectorLabels" . | nindent 6 }}
@@ -46,11 +46,16 @@ spec:
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
+            - name: VISITS_FILE
+              value: "{{ .Values.persistence.mountPath }}/visits"
           envFrom:
             - secretRef:
                 name: {{ include "devops-app.fullname" . }}-secret
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath }}
           livenessProbe:
             httpGet:
               path: {{ .Values.livenessProbe.httpGet.path }}
@@ -69,18 +74,16 @@ spec:
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-  strategy:
-    {{- if eq .Values.rollout.strategy "canary" }}
-    canary:
-      steps:
-        {{- toYaml .Values.rollout.canary.steps | nindent 8 }}
-    {{- else if eq .Values.rollout.strategy "blueGreen" }}
-    blueGreen:
-      activeService: {{ include "devops-app.fullname" . }}
-      previewService: {{ include "devops-app.fullname" . }}-preview
-      autoPromotionEnabled: {{ .Values.rollout.blueGreen.autoPromotionEnabled | default false }}
-      {{- if .Values.rollout.blueGreen.autoPromotionSeconds }}
-      autoPromotionSeconds: {{ .Values.rollout.blueGreen.autoPromotionSeconds }}
-      {{- end }}
-    {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistence.accessModes | nindent 10 }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
 {{- end }}
